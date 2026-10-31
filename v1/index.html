@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OHGze9DyRbTSG+GQmv/U1jadMi2kSlQ5HGclsv/Cn2s='; style-src 'sha256-Tuo6NdoFmPqT4x3YGcc2Hl3WDiTLr4zf1dRnU2vgOPw='; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5NlbAXKXUCL+mMT+ogiP9yYUlOA+YRWyTYBgrpT0bzs='; style-src 'sha256-Tuo6NdoFmPqT4x3YGcc2Hl3WDiTLr4zf1dRnU2vgOPw='; img-src data:; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -49,6 +49,8 @@ summary { cursor: pointer; }
   <pre id="shiji"></pre>
   <p>開くフォルダ: <code id="basho"></code></p>
   <p id="basho-chui" class="chui" hidden>フォルダを渡す形は、Claude の公式の説明に無い形です。違うフォルダで開いたら、Claude で会社フォルダ（一番上）の新しい会話を開き、下の「指示文をコピー」で写した文を貼ってください。指示文の 1 行目で、Claude もフォルダを確かめます。</p>
+  <p id="kankyou-gyou" hidden>スマホで開く場所: <code id="kankyou"></code></p>
+  <p id="kankyou-chui" class="chui" hidden>スマホの Claude のアプリに、会社の PC で動かしている待ち受け（Remote Control）のこの場所を渡します。PC の Claude のアプリでは使いません。この形も Claude の公式の説明に無い形で、場所が選ばれるかは Claude の版によります。違う場所（クラウドなど）で開いたら、Claude の画面の下の場所の札を押して、会社の PC を選んでください。</p>
   <a id="hiraku" class="btn" hidden>Claude で開く</a>
   <p id="hiraku-kekka" class="sub" aria-live="polite"></p>
   <button id="copy" class="btn sub-btn" type="button">指示文をコピー</button>
@@ -84,6 +86,7 @@ summary { cursor: pointer; }
     <li>読み終えたら、アドレス欄の「#」の後ろを消します。ブラウザの履歴に残るかは、ブラウザによります。</li>
     <li>覚えるのは「この PC で覚える」を押した時だけで、このブラウザの中に「会社の印 → 会社フォルダの場所」だけを置きます。覚えている一覧と「忘れる」は、このページを「#」の後ろを付けずに開くと出ます。</li>
     <li>フォルダを Claude に渡す形は Claude の公式の説明に無い形なので、効かない事があります。その時は Claude でフォルダを選んでください。</li>
+    <li>押す先に「スマホで開く場所の印」（env_ で始まる印）がある時は、スマホの Claude のアプリに、会社の PC の待ち受けの場所を渡します。これも公式の説明に無い形なので、効かない時は Claude で場所を選んでください。</li>
     <li>形の壊れた押す先・見えない字の入った指示文・長すぎる指示文では、開きません。誰でもこの形のリンクを作れるので、講座の Base の行から押した時だけ使ってください。</li>
   </ul>
 </details>
@@ -97,8 +100,9 @@ summary { cursor: pointer; }
   var BASHO_MAX = 1024;   // フォルダの場所の上限（字）
   var URL_MAX = 30000;    // Claude に渡すアドレスの上限（字）。Windows の命令の長さの上限 32767 の手前
   var ATAMA = "shikumika.chuukei.v1.k.";  // このブラウザの中に覚える名前の頭
-  var NAMAE = ["q", "k", "f", "folder", "set", "path"];
+  var NAMAE = ["q", "k", "f", "folder", "set", "path", "env"];
   var SHIRUSHI = /^[A-Za-z0-9_-]{1,64}$/;
+  var KANKYOU = /^env_[A-Za-z0-9]{8,64}$/;  // スマホで開く場所の印（PC の待ち受け `claude remote-control` の作業場所。Claude に environment= で渡す）
   var MIENAI = /[\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u;  // 制御の字・向きを変える字・幅の無い字・既定で見えない字（異体字の選び・結合の印など）
 
   function mijikaku(s) {
@@ -184,7 +188,7 @@ summary { cursor: pointer; }
       return { ichiran: true, furui: /(^\?|&)(q|folder|f|k)=/.test(String(search || "")) };
     }
     if (aru("set") || aru("path")) {
-      if (!aru("set") || !aru("path") || aru("q") || aru("k") || aru("f") || aru("folder")) {
+      if (!aru("set") || !aru("path") || aru("q") || aru("k") || aru("f") || aru("folder") || aru("env")) {
         return { dame: "覚える押す先は「set」と「path」の 2 つだけで作ります" };
       }
       if (!SHIRUSHI.test(kv.set)) return { dame: "会社の印の形が違います（英字・数字・- と _ の 64 字まで）" };
@@ -195,6 +199,11 @@ summary { cursor: pointer; }
     if (!aru("q")) return { dame: "指示文（q）がありません" };
     var s = shijiMiru(kv.q);
     if (s.dame) return { dame: s.dame };
+    var kankyou = "";
+    if (aru("env")) {
+      if (!KANKYOU.test(kv.env)) return { dame: "スマホで開く場所の印の形が違います（env_ で始まる英字・数字）" };
+      kankyou = kv.env;
+    }
     if (aru("f") && aru("folder")) return { dame: "フォルダが 2 か所に書かれています" };
     var fu = aru("f") ? "f" : (aru("folder") ? "folder" : "");
     if (fu && aru("k")) return { dame: "会社の印とフォルダは、どちらか 1 つで作ります" };
@@ -214,9 +223,10 @@ summary { cursor: pointer; }
         doko = "shiranai";
       }
     }
-    var url = "claude://code/new?q=" + encodeURIComponent(s.q) + (basho ? "&folder=" + encodeURIComponent(basho) : "");
+    var url = "claude://code/new?q=" + encodeURIComponent(s.q) + (basho ? "&folder=" + encodeURIComponent(basho) : "") +
+      (kankyou ? "&environment=" + encodeURIComponent(kankyou) : "");
     if (url.length > URL_MAX) return { dame: "指示文が長すぎて、Claude に渡せません。下の「指示文をコピー」で写して、Claude に貼ってください", q: s.q };
-    return { hiraku: { q: s.q, basho: basho, doko: doko, nagai: Array.from(s.q).length > NAGAI, url: url } };
+    return { hiraku: { q: s.q, basho: basho, doko: doko, kankyou: kankyou, nagai: Array.from(s.q).length > NAGAI, url: url } };
   }
 
   function el(id) { return document.getElementById(id); }
@@ -304,6 +314,11 @@ summary { cursor: pointer; }
         el("basho").textContent = "指定なし（この PC では、この会社のフォルダをまだ覚えていません。Claude で会社フォルダを選んでください）";
       } else {
         el("basho").textContent = "指定なし（Claude で選びます）";
+      }
+      if (h.kankyou) {
+        el("kankyou").textContent = h.kankyou + "（会社の PC の待ち受け）";
+        el("kankyou-gyou").hidden = false;
+        el("kankyou-chui").hidden = false;
       }
       el("hiraku").href = h.url;
       el("hiraku").hidden = false;
