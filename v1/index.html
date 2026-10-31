@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OHGze9DyRbTSG+GQmv/U1jadMi2kSlQ5HGclsv/Cn2s='; style-src 'sha256-Tuo6NdoFmPqT4x3YGcc2Hl3WDiTLr4zf1dRnU2vgOPw='; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Claude で開く（しくみラボ）</title>
+<style>
+:root { --bg: #ffffff; --fg: #1d1d1f; --sub: #5f6368; --waku: #d9dce1; --hako: #f5f6f8; --ao: #2f5bd3; --ao-fg: #ffffff; --aka: #b3261e; --aka-bg: #fdecea; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #17181b; --fg: #ececf1; --sub: #a6a9b0; --waku: #3a3d44; --hako: #22242a; --ao: #7b9cff; --ao-fg: #0d1022; --aka: #ffb4ab; --aka-bg: #3b1714; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; line-height: 1.7; }
+main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 1.4rem; margin: 0 0 8px; }
+h2 { font-size: 1.05rem; margin: 24px 0 8px; }
+p { margin: 8px 0; }
+.sub { color: var(--sub); font-size: 0.9rem; }
+pre { white-space: pre-wrap; word-break: break-word; background: var(--hako); border: 1px solid var(--waku); border-radius: 8px; padding: 12px; margin: 8px 0; font-family: inherit; font-size: 0.95rem; max-height: 60vh; overflow: auto; }
+code { background: var(--hako); border-radius: 4px; padding: 1px 4px; word-break: break-all; }
+.btn { display: block; width: 100%; margin: 12px 0 0; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--ao); background: var(--ao); color: var(--ao-fg); font-size: 1rem; text-align: center; text-decoration: none; cursor: pointer; font-family: inherit; }
+.btn.sub-btn { background: transparent; color: var(--ao); }
+.err { background: var(--aka-bg); color: var(--aka); border-radius: 8px; padding: 12px; }
+.chui { border-left: 4px solid var(--waku); padding-left: 10px; color: var(--sub); font-size: 0.9rem; }
+ol, ul { padding-left: 1.4em; margin: 8px 0; }
+li { margin: 4px 0; }
+.ichiran-gyou { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ichiran-gyou button { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--waku); background: var(--hako); color: var(--fg); font-family: inherit; cursor: pointer; }
+details { margin-top: 32px; border-top: 1px solid var(--waku); padding-top: 12px; }
+summary { cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+<h1>Claude で開く</h1>
+<p class="sub">しくみラボの Base の行の「Claude で作業」で使うページです。押したリンクに書かれた指示文を Claude のアプリに渡すだけで、ほかの事はしません。</p>
+
+<p id="err" class="err" role="alert" hidden></p>
+
+<section id="kaku" hidden>
+  <h2>Claude に渡す指示文</h2>
+  <p class="chui">この指示文は、押したリンクに書かれていた文です。誰でもこの形のリンクを作れるので、講座が中身を確かめた文かどうかは、このページには分かりません。講座の Base の行から押した時だけ使い、行の指示文と同じかを見てください。知らない人から届いたリンクや、守りを外す・鍵やパスワードを出す・消す・送るように書いた指示文は、開かないでください。</p>
+  <p id="nagai" class="chui" hidden>長い指示文です。下まで読んでから押してください。</p>
+  <pre id="shiji"></pre>
+  <p>開くフォルダ: <code id="basho"></code></p>
+  <p id="basho-chui" class="chui" hidden>フォルダを渡す形は、Claude の公式の説明に無い形です。違うフォルダで開いたら、Claude で会社フォルダ（一番上）の新しい会話を開き、下の「指示文をコピー」で写した文を貼ってください。指示文の 1 行目で、Claude もフォルダを確かめます。</p>
+  <a id="hiraku" class="btn" hidden>Claude で開く</a>
+  <p id="hiraku-kekka" class="sub" aria-live="polite"></p>
+  <button id="copy" class="btn sub-btn" type="button">指示文をコピー</button>
+  <p id="copy-kekka" class="sub" aria-live="polite"></p>
+  <ol class="sub" id="tejun">
+    <li>指示文を読んでから「Claude で開く」を押します（自動では開きません）。</li>
+    <li>ブラウザが「Claude を開きますか」と聞いたら、開く方を押します。</li>
+    <li>Claude の入力欄に指示文が入ります。送るのはあなたです（Enter）。</li>
+  </ol>
+</section>
+
+<section id="oboe" hidden>
+  <h2>この PC で会社フォルダを覚える</h2>
+  <p>会社の印 <code id="oboe-k"></code> の行を押した時に、Claude へ渡すフォルダ: <code id="oboe-path"></code></p>
+  <p id="oboe-mae" class="chui" hidden></p>
+  <p class="sub">覚えるのは、この PC のこのブラウザの中だけです。外へは送りません。覚えた物は、下の「この PC で覚えている会社フォルダ」の一覧の「忘れる」で、いつでも忘れさせられます。</p>
+  <button id="oboe-btn" class="btn" type="button">この PC で覚える</button>
+  <p id="oboe-kekka" class="sub" aria-live="polite"></p>
+</section>
+
+<section id="ichiran" hidden>
+  <h2>この PC で覚えている会社フォルダ</h2>
+  <ul id="ichiran-ul"></ul>
+  <p id="ichiran-nashi" class="sub" hidden>覚えている会社フォルダはありません。</p>
+  <p id="ichiran-kekka" class="sub" aria-live="polite"></p>
+</section>
+
+<details>
+  <summary>このページがする事・しない事</summary>
+  <ul class="sub">
+    <li>指示文は、押す先のアドレスの「#」の後ろに書かれています。「#」の後ろはブラウザが置き場（GitHub）へ送らないので、指示文は置き場に届きません。置き場には、ふつうの開いた記録（時刻・IP など）が残る事があります。</li>
+    <li>このページは外のファイルや計測を読み込まず、何も送りません（そう決めた設定をページの頭に書いてあります）。</li>
+    <li>読み終えたら、アドレス欄の「#」の後ろを消します。ブラウザの履歴に残るかは、ブラウザによります。</li>
+    <li>覚えるのは「この PC で覚える」を押した時だけで、このブラウザの中に「会社の印 → 会社フォルダの場所」だけを置きます。覚えている一覧と「忘れる」は、このページを「#」の後ろを付けずに開くと出ます。</li>
+    <li>フォルダを Claude に渡す形は Claude の公式の説明に無い形なので、効かない事があります。その時は Claude でフォルダを選んでください。</li>
+    <li>形の壊れた押す先・見えない字の入った指示文・長すぎる指示文では、開きません。誰でもこの形のリンクを作れるので、講座の Base の行から押した時だけ使ってください。</li>
+  </ul>
+</details>
+</main>
+<script>
+(function () {
+  "use strict";
+  // 押す先の約束（v1）は chuukei/README.md。読むのは「#」の後ろだけ（「?」の後ろは置き場の記録に残るので読まない）。
+  var SHIJI_MAX = 5000;   // 指示文の上限（字）。公式の claude-cli:// の q の上限に合わせた
+  var NAGAI = 1000;       // これを超えたら「下まで読んでから」と出す
+  var BASHO_MAX = 1024;   // フォルダの場所の上限（字）
+  var URL_MAX = 30000;    // Claude に渡すアドレスの上限（字）。Windows の命令の長さの上限 32767 の手前
+  var ATAMA = "shikumika.chuukei.v1.k.";  // このブラウザの中に覚える名前の頭
+  var NAMAE = ["q", "k", "f", "folder", "set", "path"];
+  var SHIRUSHI = /^[A-Za-z0-9_-]{1,64}$/;
+  var MIENAI = /[\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u;  // 制御の字・向きを変える字・幅の無い字・既定で見えない字（異体字の選び・結合の印など）
+
+  function mijikaku(s) {
+    var a = Array.from(String(s));
+    return a.length > 20 ? a.slice(0, 20).join("") + "…" : a.join("");
+  }
+
+  function yomu(hash) {
+    var s = String(hash || "");
+    if (s.charAt(0) === "#") s = s.slice(1);
+    var kv = Object.create(null), bu = s.split("&");
+    for (var i = 0; i < bu.length; i++) {
+      var p = bu[i];
+      if (p === "") continue;
+      var j = p.indexOf("=");
+      if (j < 1) return { dame: "押す先の形が違います（「名前=値」になっていない所があります）" };
+      var na = p.slice(0, j);
+      if (NAMAE.indexOf(na) < 0) return { dame: "押す先に、このページが知らない名前（" + mijikaku(na) + "）があります" };
+      if (na in kv) return { dame: "押す先に「" + na + "」が 2 つあります" };
+      try {
+        kv[na] = decodeURIComponent(p.slice(j + 1));
+      } catch (e) {
+        return { dame: "押す先の文字の符号が壊れています" };
+      }
+    }
+    return { kv: kv };
+  }
+
+  function shijiMiru(q) {
+    var t = String(q).replace(/\r\n?/g, "\n");
+    if (!/\S/.test(t)) return { dame: "指示文が空です" };
+    if (Array.from(t).length > SHIJI_MAX) return { dame: "指示文が長すぎます（" + SHIJI_MAX + " 字まで）" };
+    if (MIENAI.test(t.replace(/[\t\n]/g, ""))) return { dame: "指示文に、見えない字（制御の字・向きを変える字など）が入っています" };
+    return { q: t };
+  }
+
+  function bashoMiru(p) {
+    p = String(p || "");
+    if (!p || p.length > BASHO_MAX) return "フォルダの場所が空か、長すぎます";
+    if (MIENAI.test(p)) return "フォルダの場所に、見えない字が入っています";
+    var win = /^[A-Za-z]:[\\/]/.test(p);
+    if (!win && p.charAt(0) !== "/") return "フォルダの場所が、一番上（/ か C:\\ など）から書かれていません";
+    if (/^[\\/]{2}/.test(p)) return "ネットワークの場所（// や \\\\ で始まる所）は渡しません";
+    if (win && /[<>"|?*:]/.test(p.slice(2))) return "フォルダの場所に、Windows で使えない字があります";
+    var bu = p.split(/[\\/]/);
+    for (var i = 0; i < bu.length; i++) {
+      if (bu[i] === "." || bu[i] === "..") return "フォルダの場所に「.」か「..」があります";
+    }
+    return "";
+  }
+
+  function kuraTsukuru(ls) {
+    return {
+      yomu: function (k) {
+        try { return (ls && ls.getItem(ATAMA + k)) || ""; } catch (e) { return ""; }
+      },
+      oku: function (k, p) {
+        try { ls.setItem(ATAMA + k, p); return ls.getItem(ATAMA + k) === p; } catch (e) { return false; }
+      },
+      kesu: function (k) {
+        try { ls.removeItem(ATAMA + k); return ls.getItem(ATAMA + k) === null; } catch (e) { return false; }
+      },
+      ichiran: function () {
+        var a = [];
+        try {
+          for (var i = 0; i < ls.length; i++) {
+            var n = ls.key(i);
+            if (n && n.indexOf(ATAMA) === 0) a.push({ k: n.slice(ATAMA.length), path: ls.getItem(n) || "" });
+          }
+        } catch (e) { return null; }
+        a.sort(function (x, y) { return x.k < y.k ? -1 : (x.k > y.k ? 1 : 0); });
+        return a;
+      }
+    };
+  }
+
+  function kimeru(hash, search, kura) {
+    var r = yomu(hash);
+    if (r.dame) return { dame: r.dame };
+    var kv = r.kv;
+    function aru(n) { return n in kv; }
+    if (!NAMAE.some(aru)) {
+      return { ichiran: true, furui: /(^\?|&)(q|folder|f|k)=/.test(String(search || "")) };
+    }
+    if (aru("set") || aru("path")) {
+      if (!aru("set") || !aru("path") || aru("q") || aru("k") || aru("f") || aru("folder")) {
+        return { dame: "覚える押す先は「set」と「path」の 2 つだけで作ります" };
+      }
+      if (!SHIRUSHI.test(kv.set)) return { dame: "会社の印の形が違います（英字・数字・- と _ の 64 字まで）" };
+      var w = bashoMiru(kv.path);
+      if (w) return { dame: w };
+      return { oboe: { k: kv.set, path: kv.path, mae: kura.yomu(kv.set) } };
+    }
+    if (!aru("q")) return { dame: "指示文（q）がありません" };
+    var s = shijiMiru(kv.q);
+    if (s.dame) return { dame: s.dame };
+    if (aru("f") && aru("folder")) return { dame: "フォルダが 2 か所に書かれています" };
+    var fu = aru("f") ? "f" : (aru("folder") ? "folder" : "");
+    if (fu && aru("k")) return { dame: "会社の印とフォルダは、どちらか 1 つで作ります" };
+    var basho = "", doko = "nashi";
+    if (fu) {
+      var w2 = bashoMiru(kv[fu]);
+      if (w2) return { dame: w2 };
+      basho = kv[fu];
+      doko = "oshisaki";
+    } else if (aru("k")) {
+      if (!SHIRUSHI.test(kv.k)) return { dame: "会社の印の形が違います（英字・数字・- と _ の 64 字まで）" };
+      var m = kura.yomu(kv.k);
+      if (m && !bashoMiru(m)) {
+        basho = m;
+        doko = "oboe";
+      } else {
+        doko = "shiranai";
+      }
+    }
+    var url = "claude://code/new?q=" + encodeURIComponent(s.q) + (basho ? "&folder=" + encodeURIComponent(basho) : "");
+    if (url.length > URL_MAX) return { dame: "指示文が長すぎて、Claude に渡せません。下の「指示文をコピー」で写して、Claude に貼ってください", q: s.q };
+    return { hiraku: { q: s.q, basho: basho, doko: doko, nagai: Array.from(s.q).length > NAGAI, url: url } };
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  function copyTsukeru(q) {
+    el("copy").addEventListener("click", function () {
+      var kekka = el("copy-kekka");
+      function dekinai() { kekka.textContent = "コピーできませんでした。上の指示文を選んで、Command＋C（Windows は Ctrl＋C）でコピーしてください"; }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(q).then(function () {
+            kekka.textContent = "コピーしました。Claude の入力欄に貼って（Command＋V・Windows は Ctrl＋V）、読んでから送ってください";
+          }, dekinai);
+        } else {
+          dekinai();
+        }
+      } catch (e) {
+        dekinai();
+      }
+    });
+  }
+
+  function kakuMiseru(q) {
+    el("shiji").textContent = q;
+    el("kaku").hidden = false;
+    copyTsukeru(q);
+  }
+
+  function ichiranMiseru(kura) {
+    var ul = el("ichiran-ul");
+    while (ul.firstChild) ul.removeChild(ul.firstChild);
+    var a = kura.ichiran();
+    el("ichiran").hidden = false;
+    if (a === null) {
+      el("ichiran-nashi").textContent = "このブラウザでは、覚えている物を読めません。";
+      el("ichiran-nashi").hidden = false;
+      return;
+    }
+    el("ichiran-nashi").hidden = a.length > 0;
+    a.forEach(function (x) {
+      var li = document.createElement("li");
+      li.className = "ichiran-gyou";
+      var t = document.createElement("span");
+      t.textContent = x.k + " → " + x.path;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = "忘れる";
+      b.addEventListener("click", function () {
+        var ok = kura.kesu(x.k);
+        ichiranMiseru(kura);
+        el("ichiran-kekka").textContent = ok ? "忘れました: " + x.k : "忘れられませんでした（このブラウザでは消せません）: " + x.k;
+      });
+      li.appendChild(t);
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  function hajimeru() {
+    // 同じタブで別の行の押す先を開くと、ページは読み直されず「#」の後ろだけが変わる。前の指示文が残らないよう、読み直す
+    window.addEventListener("hashchange", function () { location.reload(); });
+    var ls = null;
+    try { ls = window.localStorage; } catch (e) { ls = null; }
+    var kura = kuraTsukuru(ls);
+    var hash = location.hash, search = location.search;
+    if (hash || search) {
+      try { history.replaceState(null, "", location.pathname); } catch (e) { /* 消せないブラウザでもページは動かす */ }
+    }
+    var r = kimeru(hash, search, kura);
+    if (r.dame) {
+      el("err").textContent = r.dame + "（開きません）";
+      el("err").hidden = false;
+      if (r.q) kakuMiseru(r.q);
+      return;
+    }
+    if (r.hiraku) {
+      var h = r.hiraku;
+      kakuMiseru(h.q);
+      el("nagai").hidden = !h.nagai;
+      var ato = { oshisaki: "（押す先に書かれた場所）", oboe: "（この PC で覚えた場所）" };
+      if (h.basho) {
+        el("basho").textContent = h.basho + ato[h.doko];
+        el("basho-chui").hidden = false;
+      } else if (h.doko === "shiranai") {
+        el("basho").textContent = "指定なし（この PC では、この会社のフォルダをまだ覚えていません。Claude で会社フォルダを選んでください）";
+      } else {
+        el("basho").textContent = "指定なし（Claude で選びます）";
+      }
+      el("hiraku").href = h.url;
+      el("hiraku").hidden = false;
+      el("hiraku").addEventListener("click", function () {
+        // 押した後に何も起きない時（Claude のアプリが無い・ブラウザが止めた）も、次にする事が見えるようにする
+        el("hiraku-kekka").textContent = "ブラウザが「Claude を開きますか」と聞いたら、開く方を押してください。何も起きない時は、Claude のアプリが入っているかを確かめ、下の「指示文をコピー」で写して Claude に貼ってください。";
+      });
+      return;
+    }
+    if (r.oboe) {
+      var o = r.oboe;
+      el("oboe-k").textContent = o.k;
+      el("oboe-path").textContent = o.path;
+      if (o.mae && o.mae !== o.path) {
+        el("oboe-mae").textContent = "この PC では前に「" + o.mae + "」を覚えていました。押すと置き換えます。";
+        el("oboe-mae").hidden = false;
+      }
+      el("oboe").hidden = false;
+      ichiranMiseru(kura);
+      el("oboe-btn").addEventListener("click", function () {
+        var ok = kura.oku(o.k, o.path);
+        ichiranMiseru(kura);
+        el("oboe-kekka").textContent = ok ? "覚えました。この会社の行の「Claude で作業」から、このフォルダを Claude に渡します。" :
+          "このブラウザでは覚えられませんでした。行を押した時は、Claude で会社フォルダを選んでください。";
+        el("oboe-btn").disabled = true;
+      });
+      return;
+    }
+    if (r.furui) {
+      el("err").textContent = "この押す先は古い形（「?」の後ろに指示文）です。指示文が置き場に届く形なので、開きません。講座に押す先を作り直してもらってください。";
+      el("err").hidden = false;
+    }
+    ichiranMiseru(kura);
+  }
+
+  hajimeru();
+})();
+</script>
+</body>
+</html>
